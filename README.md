@@ -1,8 +1,21 @@
-# HierMedKD: Hierarchical Boundary-Aware Distillation for Medical Image Segmentation
+# HierMedKD: Hierarchical Boundary-Aware Distillation for Medical Image Segmentation Across Heterogeneous Imaging Modalities
 
 Anonymous implementation accompanying a manuscript submitted to MMM 2027 for
 double-blind review. This repository contains no author names, affiliations, or
 personal contact details.
+
+This repository provides:
+
+- the PyTorch implementation of the teacher, compact student, stage adapters,
+  and three complementary distillation objectives;
+- manuscript-aligned configurations for Synapse/BTCV, ACDC, and ISIC 2018;
+- training, evaluation, and lightweight consistency-check entry points; and
+- aggregate results corresponding to the submitted manuscript.
+
+**Quick navigation:** [Method](#method-overview) ·
+[Scope](#artifact-scope) · [Setup](#environment) ·
+[Datasets](#dataset-preparation) · [Training](#training) ·
+[Evaluation](#evaluation) · [Results](#reported-results)
 
 ## Overview
 
@@ -17,6 +30,23 @@ distillation objective combines:
 The teacher and stage adapters are removed after training. The reported student
 therefore retains the same 1.36M-parameter, 0.42G-MAC inference graph as the
 scratch student.
+
+## Method Overview
+
+![HierMedKD training and inference architecture](figures/hiermedkd_architecture.png)
+
+*HierMedKD training and inference architecture. A frozen Swin-style U-Net
+teacher supervises LiteMedFormer-S through stage-aligned feature imitation,
+channel-independent activation-energy transfer, and entropy-gated
+boundary-weighted soft-label distillation. Only the 1.36M-parameter student is
+retained for inference.*
+
+The three paths are complementary. Feature imitation aligns hierarchical
+representations after resolution-matched adaptation; activation-energy
+transfer preserves spatial emphasis without forcing channel correspondence;
+and boundary-weighted distillation focuses on difficult contours while the
+teacher-entropy gate suppresses unreliable guidance. All distillation branches
+are training-only and introduce no inference-time parameters or MACs.
 
 ## Artifact Scope
 
@@ -44,10 +74,13 @@ numerical reproduction requires the missing run artifacts above.
 .
 |-- configs/                  # Base and dataset-specific YAML configurations
 |-- data/                     # Tracked Python dataset-loader package
+|-- figures/
+|   `-- hiermedkd_architecture.png # Method architecture used in this README
 |-- losses/                   # Supervised and distillation objectives
 |-- models/                   # Teacher, student, and stage adapters
 |-- results/
 |   `-- reported_results.yaml # Aggregate values in the submitted manuscript
+|-- tests/                    # Configuration and manuscript-value checks
 |-- utils/                    # Metrics and checkpoint utilities
 |-- config_loader.py          # Recursive _base_ configuration merging
 |-- train.py                  # Distillation training entry point
@@ -72,6 +105,20 @@ source .venv/bin/activate
 python -m pip install --upgrade pip
 pip install -r requirements.txt
 ```
+
+### Quick Verification
+
+The repository includes lightweight tests that require neither medical images
+nor trained checkpoints:
+
+```bash
+python -m unittest discover -s tests -v
+```
+
+These checks validate configuration inheritance and confirm that the headline
+and entropy-gate ablation values in `results/reported_results.yaml` match the
+submitted manuscript. They are consistency checks, not substitutes for
+training or evaluation experiments.
 
 ## Dataset Preparation
 
@@ -184,8 +231,8 @@ Synapse model-only measurements at `1 x 1 x 224 x 224`:
 | Scratch student | 1.36M | 0.42G | 76.42 +- 1.21 | 12.3 ms |
 | HierMedKD | 1.36M | 0.42G | 86.45 +- 0.78 | 12.3 ms |
 
-Full baseline and ablation tables are stored in
-`results/reported_results.yaml`.
+Full baseline, efficiency, and ablation tables are stored in
+[`results/reported_results.yaml`](results/reported_results.yaml).
 
 ## Anonymous Citation
 
