@@ -1,0 +1,90 @@
+# Base configuration for HierMedKD
+
+# Model settings
+model:
+  teacher:
+    name: "swin_unet"
+    embed_dim: 96
+    depths: [2, 2, 6, 2]
+    num_heads: [3, 6, 12, 24]
+    window_size: 7
+    mlp_ratio: 4.0
+    encoder_strides: [4, 8, 16, 32]
+    
+  student:
+    name: "litemedformer_s"
+    in_channels: 1  # 1 for CT/MRI, 3 for RGB
+    num_classes: 8   # Dataset-specific
+    encoder_channels: [32, 64, 96, 192]
+    decoder_channels: [192, 96, 64, 32]
+    
+  adapters:
+    use_adapters: true
+    adapter_type: "conv1x1"  # conv1x1 or linear
+
+# Training settings
+training:
+  batch_size: 8
+  num_epochs: 300
+  learning_rate: 0.0003
+  weight_decay: 0.01
+  warmup_epochs: 10
+  cosine_scheduler: true
+  mixed_precision: true
+  gradient_clip: 1.0
+  
+  # Loss weights
+  loss_weights:
+    lambda_feat: 1.0
+    lambda_att: 1.0
+    lambda_kl: 1.0
+    
+  # KD parameters
+  kd:
+    temperature: 4.0
+    beta: 4.0  # Boundary weight
+    kernel_size: 3  # Morphological kernel
+    confidence_gating: true
+    epsilon: 1e-6
+
+# Data settings
+data:
+  image_size: [224, 224]
+  num_workers: 4
+  pin_memory: true
+  horizontal_flip_probability: 0.0
+  
+  # Augmentation
+  augmentation:
+    random_flip: false
+    random_rotate: false
+    random_scale: false
+    random_crop: false
+    normalize: true
+
+# Evaluation settings
+evaluation:
+  metrics: ["dice", "jaccard", "hd95", "nsd", "boundary_iou"]
+  boundary_dilation_ratio: 0.02  # For 2D images
+  nsd_tolerance: 1.0  # mm for volumetric data
+  num_bootstrap: 10000
+  confidence_level: 0.95
+
+# Checkpoint settings
+checkpoint:
+  save_dir: "checkpoints"
+  save_freq: 10
+  save_best: true
+  metric: "dice"  # Metric for best model selection
+  
+# Logging
+logging:
+  log_dir: "logs"
+  tensorboard: true
+  print_freq: 10
+  
+# Reproducibility
+reproducibility:
+  seed: 2027
+  deterministic: true
+  benchmark: false

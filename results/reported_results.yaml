@@ -1,0 +1,63 @@
+# Aggregate values transcribed from Tables 2-6 of the submitted manuscript.
+# Each ci95_half_width is the reported half-width of a 95% bootstrap interval.
+
+synapse:
+  protocol: "14/4/12 train/validation/local-test; three seeds"
+  methods:
+    teacher: {params_m: 34.49, dice: 85.10, dice_ci95_half_width: 1.25, hd95_mm: 14.23, hd95_ci95_half_width: 1.78, nsd: 75.67, nsd_ci95_half_width: 2.34}
+    nnunet: {dice: 81.53, dice_ci95_half_width: 1.45, hd95_mm: 17.23, hd95_ci95_half_width: 2.56, nsd: 70.12, nsd_ci95_half_width: 3.45}
+    transunet: {params_m: 103.24, dice: 79.82, dice_ci95_half_width: 1.67, hd95_mm: 18.45, hd95_ci95_half_width: 2.78, nsd: 68.34, nsd_ci95_half_width: 3.67}
+    swin_unet: {params_m: 34.49, dice: 81.72, dice_ci95_half_width: 1.32, hd95_mm: 16.89, hd95_ci95_half_width: 2.34, nsd: 71.23, nsd_ci95_half_width: 3.12}
+    scratch: {params_m: 1.36, dice: 76.42, dice_ci95_half_width: 1.21, hd95_mm: 18.73, hd95_ci95_half_width: 2.34, nsd: 68.35, nsd_ci95_half_width: 3.12}
+    logit_kd: {params_m: 1.36, dice: 78.15, dice_ci95_half_width: 1.08, hd95_mm: 16.89, hd95_ci95_half_width: 2.01, nsd: 71.28, nsd_ci95_half_width: 2.87}
+    fitnets: {params_m: 1.36, dice: 79.23, dice_ci95_half_width: 0.95, hd95_mm: 15.67, hd95_ci95_half_width: 1.87, nsd: 73.45, nsd_ci95_half_width: 2.56}
+    activation_transfer: {params_m: 1.36, dice: 80.12, dice_ci95_half_width: 0.89, hd95_mm: 14.52, hd95_ci95_half_width: 1.72, nsd: 75.23, nsd_ci95_half_width: 2.34}
+    structured_kd: {params_m: 1.36, dice: 81.08, dice_ci95_half_width: 0.82, hd95_mm: 13.48, hd95_ci95_half_width: 1.58, nsd: 76.89, nsd_ci95_half_width: 2.12}
+    supervised_boundary_control: {params_m: 1.36, dice: 81.95, dice_ci95_half_width: 0.78, hd95_mm: 12.67, hd95_ci95_half_width: 1.45, nsd: 78.12, nsd_ci95_half_width: 1.98}
+    boundary_body_kd_control: {params_m: 1.36, dice: 82.87, dice_ci95_half_width: 0.74, hd95_mm: 11.89, hd95_ci95_half_width: 1.32, nsd: 79.45, nsd_ci95_half_width: 1.87}
+    hiermedkd: {params_m: 1.36, dice: 86.45, dice_ci95_half_width: 0.78, hd95_mm: 12.34, hd95_ci95_half_width: 1.23, nsd: 78.56, nsd_ci95_half_width: 1.87}
+
+acdc:
+  protocol: "70/10/20 patient split; three seeds"
+  methods:
+    teacher: {params_m: 34.49, dice: 90.45, dice_ci95_half_width: 1.15, hd95_mm: 5.89, hd95_ci95_half_width: 1.28, nsd: 87.78, nsd_ci95_half_width: 2.12}
+    nnunet: {dice: 89.10, dice_ci95_half_width: 1.25, hd95_mm: 6.23, hd95_ci95_half_width: 1.45, nsd: 85.67, nsd_ci95_half_width: 2.34}
+    transunet: {params_m: 103.24, dice: 88.50, dice_ci95_half_width: 1.32, hd95_mm: 6.89, hd95_ci95_half_width: 1.56, nsd: 84.23, nsd_ci95_half_width: 2.45}
+    swin_unet: {params_m: 34.49, dice: 89.80, dice_ci95_half_width: 1.18, hd95_mm: 5.98, hd95_ci95_half_width: 1.38, nsd: 86.45, nsd_ci95_half_width: 2.23}
+    scratch: {params_m: 1.36, dice: 87.23, dice_ci95_half_width: 1.15, hd95_mm: 8.45, hd95_ci95_half_width: 1.23, nsd: 82.67, nsd_ci95_half_width: 2.34}
+    logit_kd: {params_m: 1.36, dice: 88.67, dice_ci95_half_width: 1.02, hd95_mm: 7.89, hd95_ci95_half_width: 1.12, nsd: 84.56, nsd_ci95_half_width: 2.12}
+    fitnets: {params_m: 1.36, dice: 89.45, dice_ci95_half_width: 0.95, hd95_mm: 7.34, hd95_ci95_half_width: 1.05, nsd: 86.23, nsd_ci95_half_width: 1.98}
+    activation_transfer: {params_m: 1.36, dice: 90.12, dice_ci95_half_width: 0.89, hd95_mm: 6.89, hd95_ci95_half_width: 0.98, nsd: 87.45, nsd_ci95_half_width: 1.87}
+    structured_kd: {params_m: 1.36, dice: 90.89, dice_ci95_half_width: 0.82, hd95_mm: 6.45, hd95_ci95_half_width: 0.89, nsd: 88.67, nsd_ci95_half_width: 1.76}
+    supervised_boundary_control: {params_m: 1.36, dice: 91.56, dice_ci95_half_width: 0.78, hd95_mm: 6.12, hd95_ci95_half_width: 0.82, nsd: 89.78, nsd_ci95_half_width: 1.65}
+    boundary_body_kd_control: {params_m: 1.36, dice: 92.23, dice_ci95_half_width: 0.74, hd95_mm: 5.78, hd95_ci95_half_width: 0.76, nsd: 90.89, nsd_ci95_half_width: 1.54}
+    hiermedkd: {params_m: 1.36, dice: 91.89, dice_ci95_half_width: 0.78, hd95_mm: 5.67, hd95_ci95_half_width: 0.72, nsd: 91.34, nsd_ci95_half_width: 1.56}
+
+isic2018:
+  protocol: "1815/259/520 image split; three seeds"
+  methods:
+    teacher: {params_m: 34.49, dice: 90.12, dice_ci95_half_width: 1.08, jaccard: 82.34, jaccard_ci95_half_width: 1.45, hd95_px: 9.78, hd95_ci95_half_width: 1.67}
+    unet: {dice: 87.20, dice_ci95_half_width: 1.45, jaccard: 78.50, jaccard_ci95_half_width: 1.87, hd95_px: 12.34, hd95_ci95_half_width: 2.45}
+    attention_unet: {dice: 88.50, dice_ci95_half_width: 1.32, jaccard: 79.80, jaccard_ci95_half_width: 1.72, hd95_px: 11.56, hd95_ci95_half_width: 2.23}
+    transunet: {params_m: 103.24, dice: 89.10, dice_ci95_half_width: 1.18, jaccard: 80.90, jaccard_ci95_half_width: 1.58, hd95_px: 10.89, hd95_ci95_half_width: 2.01}
+    scratch: {params_m: 1.36, dice: 82.34, dice_ci95_half_width: 1.32, jaccard: 72.45, jaccard_ci95_half_width: 1.87, hd95_px: 15.67, hd95_ci95_half_width: 2.34}
+    logit_kd: {params_m: 1.36, dice: 84.12, dice_ci95_half_width: 1.18, jaccard: 74.23, jaccard_ci95_half_width: 1.72, hd95_px: 14.23, hd95_ci95_half_width: 2.12}
+    fitnets: {params_m: 1.36, dice: 85.45, dice_ci95_half_width: 1.05, jaccard: 75.89, jaccard_ci95_half_width: 1.58, hd95_px: 13.12, hd95_ci95_half_width: 1.98}
+    activation_transfer: {params_m: 1.36, dice: 86.78, dice_ci95_half_width: 0.98, jaccard: 77.34, jaccard_ci95_half_width: 1.45, hd95_px: 12.34, hd95_ci95_half_width: 1.87}
+    structured_kd: {params_m: 1.36, dice: 87.89, dice_ci95_half_width: 0.92, jaccard: 78.67, jaccard_ci95_half_width: 1.34, hd95_px: 11.56, hd95_ci95_half_width: 1.76}
+    supervised_boundary_control: {params_m: 1.36, dice: 88.67, dice_ci95_half_width: 0.87, jaccard: 79.89, jaccard_ci95_half_width: 1.23, hd95_px: 10.89, hd95_ci95_half_width: 1.65}
+    boundary_body_kd_control: {params_m: 1.36, dice: 89.45, dice_ci95_half_width: 0.82, jaccard: 81.12, jaccard_ci95_half_width: 1.15, hd95_px: 10.23, hd95_ci95_half_width: 1.54}
+    hiermedkd: {params_m: 1.36, dice: 90.89, dice_ci95_half_width: 0.82, jaccard: 83.12, jaccard_ci95_half_width: 0.95, hd95_px: 9.45, hd95_ci95_half_width: 1.23}
+
+synapse_efficiency:
+  input_shape: [1, 1, 224, 224]
+  teacher: {params_m: 34.49, macs_g: 17.93, dice: 85.10, dice_ci95_half_width: 1.25, median_latency_ms: 45.2}
+  scratch: {params_m: 1.36, macs_g: 0.42, dice: 76.42, dice_ci95_half_width: 1.21, median_latency_ms: 12.3}
+  hiermedkd: {params_m: 1.36, macs_g: 0.42, dice: 86.45, dice_ci95_half_width: 0.78, median_latency_ms: 12.3}
+
+synapse_ablation:
+  full: {dice: 86.45, dice_ci95_half_width: 0.78, hd95_mm: 12.34, hd95_ci95_half_width: 1.23}
+  without_feature_loss: {dice: 83.23, dice_ci95_half_width: 0.85, hd95_mm: 14.56, hd95_ci95_half_width: 1.34}
+  without_activation_loss: {dice: 84.67, dice_ci95_half_width: 0.82, hd95_mm: 13.78, hd95_ci95_half_width: 1.28}
+  without_entropy_gate: {dice: 85.34, dice_ci95_half_width: 0.79, hd95_mm: 13.12, hd95_ci95_half_width: 1.21}
+  without_boundary_weight: {dice: 84.12, dice_ci95_half_width: 0.83, hd95_mm: 14.23, hd95_ci95_half_width: 1.31}

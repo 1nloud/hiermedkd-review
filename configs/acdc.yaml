@@ -1,0 +1,41 @@
+# ACDC cardiac MRI dataset configuration
+
+# Inherits from base.yaml
+_base_: "base.yaml"
+
+# Dataset-specific settings
+data:
+  dataset_name: "acdc"
+  data_dir: "datasets/acdc"
+  in_channels: 1
+  num_classes: 4  # background, RV, myocardium, LV
+  ignore_label: 255
+  horizontal_flip_probability: 0.5
+  
+  # Split configuration: 70/10/20 from 100 training patients
+  split:
+    train: 70
+    val: 10
+    test: 20
+    seed: 2027
+    
+# Model settings
+model:
+  student:
+    in_channels: 1
+    num_classes: 4
+    
+# Training settings
+training:
+  batch_size: 8
+  num_epochs: 300
+  
+# Evaluation
+evaluation:
+  nsd_tolerance: 1.0  # mm, matching the manuscript protocol
+
+# Preprocessing (as per paper):
+# - Clip nonzero p0.5/p99.5 then z-score normalization
+# - Horizontal flip probability 0.5
+# - Bilinear/nearest resizing to 224x224
+# - No other geometric augmentations

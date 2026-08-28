@@ -1,0 +1,42 @@
+# ISIC 2018 dermoscopy dataset configuration
+
+# Inherits from base.yaml
+_base_: "base.yaml"
+
+# Dataset-specific settings
+data:
+  dataset_name: "isic"
+  data_dir: "datasets/isic"
+  in_channels: 3  # RGB images
+  num_classes: 2  # background, lesion
+  ignore_label: 255
+  horizontal_flip_probability: 0.5
+  num_workers: 0
+  
+  # Split configuration: 1815/259/520 from 2594 training images
+  split:
+    train: 1815
+    val: 259
+    test: 520
+    seed: 2027
+    
+# Model settings
+model:
+  student:
+    in_channels: 3
+    num_classes: 2
+    
+# Training settings
+training:
+  batch_size: 4  # Smaller batch for 2D images
+  num_epochs: 200
+  
+# Evaluation
+evaluation:
+  boundary_dilation_ratio: 0.02  # 2% of image diagonal for 2D masks
+
+# Preprocessing (as per paper):
+# - RGB/255 normalization
+# - Horizontal flip probability 0.5
+# - Bilinear/nearest resizing to 224x224
+# - No other geometric augmentations
