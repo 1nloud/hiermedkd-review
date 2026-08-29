@@ -22,6 +22,11 @@ class ConfigLoaderTests(unittest.TestCase):
         self.assertEqual(config["data"]["split"]["seed"], 2027)
         self.assertEqual(config["reproducibility"]["seed"], 2027)
 
+    def test_synapse_has_background_plus_eight_organs(self):
+        config = load_config(str(ROOT / "configs" / "synapse.yaml"))
+        self.assertEqual(config["data"]["num_classes"], 9)
+        self.assertEqual(config["model"]["student"]["num_classes"], 9)
+
 
 if __name__ == "__main__":
     unittest.main()

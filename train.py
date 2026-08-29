@@ -29,7 +29,7 @@ from losses.supervised_loss import SupervisedLoss
 from data.synapse import SynapseDataset
 from data.acdc import ACDCDataset
 from data.isic import ISICDataset
-from utils import save_checkpoint, SegmentationMetrics
+from utils import save_checkpoint, SegmentationMetrics, sha256_file, split_manifest_sha256
 from config_loader import load_config
 
 
@@ -128,7 +128,8 @@ def train_one_epoch(
                 teacher_logits,
                 student_logits,
                 labels,
-                config['data']['ignore_label']
+                config['data']['ignore_label'],
+                native_student_features=student_features,
             )
             kd_value = kd_loss_dict['kd_loss']
             
@@ -255,6 +256,8 @@ def main():
     if isinstance(teacher_state, dict):
         teacher_state = teacher_state.get('teacher', teacher_state.get('model', teacher_state.get('state_dict', teacher_state)))
     teacher.load_state_dict(teacher_state, strict=True)
+    teacher_checkpoint_sha256 = sha256_file(args.teacher_checkpoint)
+    print(f"Teacher checkpoint SHA-256: {teacher_checkpoint_sha256}")
     
     student = LiteMedFormerS(
         in_channels=config['data']['in_channels'],
@@ -392,7 +395,10 @@ def main():
             'optimizer': optimizer.state_dict(),
             'scheduler': scheduler.state_dict() if scheduler is not None else None,
             'best_dice': best_dice,
-            'config': config
+            'config': config,
+            'teacher_checkpoint_sha256': teacher_checkpoint_sha256,
+            'train_split_sha256': split_manifest_sha256(train_dataset),
+            'validation_split_sha256': split_manifest_sha256(val_dataset),
         }
         
         checkpoint_dir = os.path.join(config['checkpoint']['save_dir'], config['data']['dataset_name'])

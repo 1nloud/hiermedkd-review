@@ -173,15 +173,32 @@ class SwinTransformerBlock(nn.Module):
         # Cyclic shift
         if self.shift_size > 0:
             shifted_x = torch.roll(x, shifts=(-self.shift_size, -self.shift_size), dims=(1, 2))
+            image_mask = torch.zeros((1, Hp, Wp, 1), device=x.device)
+            h_slices = (
+                slice(0, -self.window_size),
+                slice(-self.window_size, -self.shift_size),
+                slice(-self.shift_size, None),
+            )
+            w_slices = h_slices
+            region_id = 0
+            for h_slice in h_slices:
+                for w_slice in w_slices:
+                    image_mask[:, h_slice, w_slice, :] = region_id
+                    region_id += 1
+            mask_windows = window_partition(image_mask, self.window_size)
+            mask_windows = mask_windows.view(-1, self.window_size ** 2)
+            attn_mask = mask_windows.unsqueeze(1) - mask_windows.unsqueeze(2)
+            attn_mask = attn_mask.masked_fill(attn_mask != 0, -100.0)
         else:
             shifted_x = x
+            attn_mask = None
         
         # Partition windows
         x_windows = window_partition(shifted_x, self.window_size)
         x_windows = x_windows.view(-1, self.window_size * self.window_size, C)
         
         # W-MSA / SW-MSA
-        attn_windows = self.attn(x_windows)
+        attn_windows = self.attn(x_windows, attn_mask)
         
         # Merge windows
         attn_windows = attn_windows.view(-1, self.window_size, self.window_size, C)
@@ -325,7 +342,7 @@ class BasicLayer(nn.Module):
                 qkv_bias=qkv_bias,
                 drop=drop,
                 attn_drop=attn_drop,
-                drop_path=drop_path
+                drop_path=drop_path[i] if isinstance(drop_path, (list, tuple)) else drop_path
             )
             for i in range(depth)
         ])
@@ -427,7 +444,7 @@ class SwinUNETeacher(nn.Module):
         # Decoder (convolutional U-Net style)
         self.decoder_upsample = nn.ModuleList([
             nn.ConvTranspose2d(
-                self.encoder_dims[3 + i] // 2, self.encoder_dims[2 - i],
+                self.encoder_dims[3 - i], self.encoder_dims[2 - i],
                 kernel_size=2, stride=2
             )
             for i in range(3)
@@ -435,7 +452,7 @@ class SwinUNETeacher(nn.Module):
         
         self.decoder_conv = nn.ModuleList([
             nn.Sequential(
-                nn.Conv2d(self.encoder_dims[3 - i] + self.encoder_dims[2 - i], self.encoder_dims[2 - i], 3, padding=1),
+                nn.Conv2d(2 * self.encoder_dims[2 - i], self.encoder_dims[2 - i], 3, padding=1),
                 nn.BatchNorm2d(self.encoder_dims[2 - i]),
                 nn.ReLU(inplace=True),
                 nn.Conv2d(self.encoder_dims[2 - i], self.encoder_dims[2 - i], 3, padding=1),

@@ -2,7 +2,7 @@
 ISIC 2018 dermoscopy dataset loader.
 
 Data: 2594 dermoscopy images with lesion segmentation masks.
-Split: 1815 train / 259 val / 100 test.
+Split: 1815 train / 259 val / 520 test.
 """
 
 import os
@@ -114,3 +114,30 @@ class ISICDataset(BaseMedicalDataset):
         label = resize(label, self.image_size, order=0, mode='constant', anti_aliasing=False)
         
         return label
+
+    def sample_metadata(self, idx: int) -> dict:
+        image_id = self.case_ids[idx]
+        input_path = os.path.join(
+            self.data_dir,
+            'ISIC2018_Task1-2_Training_Input',
+            f"{image_id}.jpg",
+        )
+        with Image.open(input_path) as image:
+            width, height = image.size
+        return {
+            'case_id': image_id,
+            'volume_id': image_id,
+            'slice_index': None,
+            'native_shape': (height, width),
+            'spacing': (1.0, 1.0),
+        }
+
+    def native_label_slice(self, idx: int) -> np.ndarray:
+        image_id = self.case_ids[idx]
+        label_path = os.path.join(
+            self.data_dir,
+            'ISIC2018_Task1_Training_GroundTruth',
+            f"{image_id}_segmentation.png",
+        )
+        with Image.open(label_path) as label:
+            return (np.asarray(label, dtype=np.uint8) > 0).astype(np.int64)

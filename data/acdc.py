@@ -36,6 +36,38 @@ class ACDCDataset(BaseMedicalDataset):
             data_dir, split, image_size, in_channels, num_classes, ignore_label,
             transform, horizontal_flip_probability
         )
+        self.patient_ids = list(self.case_ids)
+        self.case_ids = self._build_slice_index(self.patient_ids)
+
+    def _build_slice_index(self, patient_ids: List[str]) -> List[tuple]:
+        """Enumerate every slice from both annotated cardiac phases."""
+        samples = []
+        for patient_id in patient_ids:
+            patient_dir = os.path.join(self.data_dir, 'training', patient_id)
+            frames = sorted(
+                f for f in os.listdir(patient_dir)
+                if f.endswith('.nii.gz') and '_gt' not in f and '_4d' not in f
+            )
+            if len(frames) != 2:
+                raise ValueError(
+                    f"Expected two annotated ACDC frames for {patient_id}, found {len(frames)}"
+                )
+            for frame_name in frames:
+                frame_stem = frame_name[:-7]
+                depth = int(nib.load(os.path.join(patient_dir, frame_name)).shape[2])
+                samples.extend(
+                    (patient_id, frame_stem, slice_idx)
+                    for slice_idx in range(depth)
+                )
+        return samples
+
+    @staticmethod
+    def _unpack_sample(sample_id):
+        if not isinstance(sample_id, tuple) or len(sample_id) != 3:
+            raise ValueError(
+                f"Expected (patient_id, frame_stem, slice_index), got {sample_id!r}"
+            )
+        return sample_id[0], sample_id[1], int(sample_id[2])
     
     def get_case_ids(self, split: str) -> List[str]:
         """
@@ -70,7 +102,7 @@ class ACDCDataset(BaseMedicalDataset):
         else:
             raise ValueError(f"Unknown split: {split}")
     
-    def _load_image(self, patient_id: str) -> np.ndarray:
+    def _load_image(self, sample_id) -> np.ndarray:
         """
         Load MRI frame and extract random frame.
         
@@ -80,30 +112,28 @@ class ACDCDataset(BaseMedicalDataset):
         Returns:
             (H, W) normalized MRI slice
         """
-        # Load all frames for this patient
+        patient_id, frame_stem, slice_idx = self._unpack_sample(sample_id)
+
+        # Load the indexed cardiac phase for this patient.
         patient_dir = os.path.join(self.data_dir, 'training', patient_id)
-        frames = sorted(
-            f for f in os.listdir(patient_dir)
-            if f.endswith('.nii.gz') and '_gt' not in f and '_4d' not in f
-        )
-        
-        # Select random frame
-        frame_path = os.path.join(patient_dir, frames[0])
+        frame_path = os.path.join(patient_dir, f"{frame_stem}.nii.gz")
         vol = nib.load(frame_path).get_fdata()
         
         # Clip nonzero p0.5/p99.5 as per paper
-        nonzero_vals = vol[vol != 0]
+        foreground = vol != 0
+        nonzero_vals = vol[foreground]
         if len(nonzero_vals) > 0:
             p05 = np.percentile(nonzero_vals, 0.5)
             p995 = np.percentile(nonzero_vals, 99.5)
-            vol = np.clip(vol, p05, p995)
+            clipped = np.clip(nonzero_vals, p05, p995)
+            mean = clipped.mean()
+            std = clipped.std()
+            vol = np.zeros_like(vol, dtype=np.float32)
+            if std > 0:
+                vol[foreground] = (clipped - mean) / std
+            else:
+                vol[foreground] = clipped - mean
         
-        # Z-score normalization as per paper
-        if vol.std() > 0:
-            vol = (vol - vol.mean()) / vol.std()
-        
-        # Select middle slice
-        slice_idx = vol.shape[2] // 2
         image = vol[:, :, slice_idx]
         
         # Resize to target size (bilinear as per paper)
@@ -112,21 +142,18 @@ class ACDCDataset(BaseMedicalDataset):
         
         return image
     
-    def _load_label(self, patient_id: str) -> np.ndarray:
+    def _load_label(self, sample_id) -> np.ndarray:
         """
         Load label frame and extract corresponding slice.
         
         Returns:
             (H, W) label slice
         """
+        patient_id, frame_stem, slice_idx = self._unpack_sample(sample_id)
         patient_dir = os.path.join(self.data_dir, 'training', patient_id)
-        frames = sorted(f for f in os.listdir(patient_dir) if f.endswith('_gt.nii.gz'))
-        
-        frame_path = os.path.join(patient_dir, frames[0])
+        frame_path = os.path.join(patient_dir, f"{frame_stem}_gt.nii.gz")
         label_vol = nib.load(frame_path).get_fdata()
         
-        # Select same slice as image
-        slice_idx = label_vol.shape[2] // 2
         label = label_vol[:, :, slice_idx].astype(np.int64)
         
         # Resize to target size
@@ -134,3 +161,27 @@ class ACDCDataset(BaseMedicalDataset):
         label = resize(label, self.image_size, order=0, mode='constant', anti_aliasing=False)
         
         return label
+
+    def sample_metadata(self, idx: int) -> dict:
+        patient_id, frame_stem, slice_idx = self._unpack_sample(self.case_ids[idx])
+        frame_nii = nib.load(
+            os.path.join(
+                self.data_dir, 'training', patient_id, f"{frame_stem}.nii.gz"
+            )
+        )
+        return {
+            'case_id': patient_id,
+            'volume_id': f"{patient_id}/{frame_stem}",
+            'slice_index': slice_idx,
+            'native_shape': tuple(int(v) for v in frame_nii.shape[:3]),
+            'spacing': tuple(float(v) for v in frame_nii.header.get_zooms()[:3]),
+        }
+
+    def native_label_slice(self, idx: int) -> np.ndarray:
+        patient_id, frame_stem, slice_idx = self._unpack_sample(self.case_ids[idx])
+        label_nii = nib.load(
+            os.path.join(
+                self.data_dir, 'training', patient_id, f"{frame_stem}_gt.nii.gz"
+            )
+        )
+        return np.asarray(label_nii.dataobj[:, :, slice_idx], dtype=np.int64)

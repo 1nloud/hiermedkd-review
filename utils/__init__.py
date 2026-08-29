@@ -9,6 +9,23 @@ from typing import Dict, List, Tuple, Optional
 import os
 import json
 import shutil
+import hashlib
+
+
+def sha256_file(path: str, chunk_size: int = 1024 * 1024) -> str:
+    """Return the SHA-256 digest of a file without loading it all into memory."""
+    digest = hashlib.sha256()
+    with open(path, 'rb') as handle:
+        for chunk in iter(lambda: handle.read(chunk_size), b''):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def split_manifest_sha256(dataset) -> str:
+    """Hash the ordered patient/image IDs that define a dataset split."""
+    identifiers = getattr(dataset, 'patient_ids', dataset.case_ids)
+    payload = '\n'.join(str(identifier) for identifier in identifiers).encode('utf-8')
+    return hashlib.sha256(payload).hexdigest()
 
 
 def compute_dice(
@@ -125,7 +142,7 @@ def compute_nsd(
     Returns:
         NSD value
     """
-    from scipy.ndimage import distance_transform_edt
+    from scipy.ndimage import binary_erosion, distance_transform_edt
     
     pred_binary = (pred > 0).astype(np.uint8)
     label_binary = (label > 0).astype(np.uint8)
@@ -136,17 +153,18 @@ def compute_nsd(
     if np.sum(pred_binary) == 0 or np.sum(label_binary) == 0:
         return 0.0
     
-    # Distance transforms
-    pred_dtf = distance_transform_edt(1 - pred_binary, sampling=spacing)
-    label_dtf = distance_transform_edt(1 - label_binary, sampling=spacing)
-    
-    # Surface points
-    pred_surface = (pred_dtf <= 1.0) & (pred_binary > 0)
-    label_surface = (label_dtf <= 1.0) & (label_binary > 0)
-    
-    # Count surface points within tolerance
-    pred_to_label = np.sum(pred_surface & (label_dtf <= tolerance))
-    label_to_pred = np.sum(label_surface & (pred_dtf <= tolerance))
+    pred_bool = pred_binary.astype(bool)
+    label_bool = label_binary.astype(bool)
+    pred_surface = pred_bool ^ binary_erosion(pred_bool)
+    label_surface = label_bool ^ binary_erosion(label_bool)
+
+    distance_to_label = distance_transform_edt(~label_surface, sampling=spacing)
+    distance_to_pred = distance_transform_edt(~pred_surface, sampling=spacing)
+
+    # Symmetric surface Dice: surface elements from each mask that lie within
+    # the physical tolerance of the other mask's surface.
+    pred_to_label = np.sum(distance_to_label[pred_surface] <= tolerance)
+    label_to_pred = np.sum(distance_to_pred[label_surface] <= tolerance)
     
     total_pred_surface = np.sum(pred_surface)
     total_label_surface = np.sum(label_surface)

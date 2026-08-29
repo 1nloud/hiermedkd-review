@@ -8,7 +8,7 @@ data:
   dataset_name: "synapse"
   data_dir: "datasets/synapse"
   in_channels: 1
-  num_classes: 8  # 8 organs: aorta, gallbladder, L/R kidney, liver, pancreas, spleen, stomach
+  num_classes: 9  # background + 8 organs
   ignore_label: 255
   horizontal_flip_probability: 0.0
   
@@ -23,7 +23,7 @@ data:
 model:
   student:
     in_channels: 1
-    num_classes: 8
+    num_classes: 9
     
 # Training settings
 training:

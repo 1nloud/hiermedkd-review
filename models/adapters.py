@@ -115,6 +115,11 @@ class StageAdapters(nn.Module):
         Returns:
             List of aligned feature maps matching teacher's channel dimensions
         """
+        if len(student_features) != len(self.adapters):
+            raise ValueError(
+                f"Expected {len(self.adapters)} student stages, got {len(student_features)}"
+            )
+
         aligned_features = []
         for feat, adapter in zip(student_features, self.adapters):
             aligned_features.append(adapter(feat))

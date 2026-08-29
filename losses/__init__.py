@@ -11,7 +11,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from typing import List, Dict, Optional
-import numpy as np
+import math
 
 
 class NormalizedFeatureLoss(nn.Module):
@@ -65,8 +65,17 @@ class NormalizedFeatureLoss(nn.Module):
             t_normalized = t_feat / torch.clamp(t_norm, min=self.epsilon)
             s_normalized = s_feat / torch.clamp(s_norm, min=self.epsilon)
             
-            # Compute MSE loss and average over spatial locations
-            feat_loss = F.mse_loss(t_normalized, s_normalized, reduction='mean')
+            if t_normalized.shape != s_normalized.shape:
+                raise ValueError(
+                    "Aligned teacher and student features must have identical shapes; "
+                    f"got {tuple(t_normalized.shape)} and {tuple(s_normalized.shape)}"
+                )
+
+            # Eq. (1): squared L2 over channels, then average over B,H,W.
+            # torch.mean over every element would introduce an unintended 1/C factor.
+            feat_loss = torch.sum(
+                (t_normalized - s_normalized) ** 2, dim=1
+            ).mean()
             
             total_loss += weight * feat_loss
         
@@ -150,8 +159,11 @@ class ActivationEnergyLoss(nn.Module):
             t_normalized = t_energy / torch.clamp(t_norm, min=self.epsilon)
             s_normalized = s_energy_resized / torch.clamp(s_norm, min=self.epsilon)
             
-            # Compute MSE loss (no spatial averaging needed due to unit norm)
-            att_loss = F.mse_loss(t_normalized, s_normalized, reduction='mean')
+            # Eq. (2): squared L2 over the complete spatial energy map, averaged
+            # only over batch items. There is intentionally no 1/(H*W) factor.
+            att_loss = torch.sum(
+                (t_normalized - s_normalized) ** 2, dim=(1, 2)
+            ).mean()
             
             total_loss += weight * att_loss
         
@@ -183,16 +195,14 @@ class BoundaryWeightedKLLoss(nn.Module):
         self.epsilon = epsilon
         self.confidence_gating = confidence_gating
         
-        # Morphological kernel for boundary extraction
-        self.register_buffer(
-            'kernel',
-            torch.ones(1, 1, kernel_size, kernel_size) / (kernel_size ** 2)
-        )
+        if kernel_size < 1 or kernel_size % 2 == 0:
+            raise ValueError("kernel_size must be a positive odd integer")
     
     def extract_boundary_mask(
         self,
         label: torch.Tensor,
-        ignore_label: int = 255
+        ignore_label: int = 255,
+        num_classes: Optional[int] = None
     ) -> torch.Tensor:
         """
         Extract multiclass boundary mask using morphological operations.
@@ -204,34 +214,41 @@ class BoundaryWeightedKLLoss(nn.Module):
         Returns:
             Boundary mask of shape (B, H, W) with 1 at boundary, 0 elsewhere
         """
+        if label.ndim != 3:
+            raise ValueError(f"label must have shape (B,H,W), got {tuple(label.shape)}")
+
         B, H, W = label.shape
-        num_classes = label.max().item() + 1
+        if num_classes is None:
+            valid_values = label[label != ignore_label]
+            num_classes = int(valid_values.max().item()) + 1 if valid_values.numel() else 1
+
+        padding = self.kernel_size // 2
         
         # Create one-hot masks for each foreground class
         boundary_masks = []
         for c in range(1, num_classes):  # Skip background (class 0)
             class_mask = (label == c).float().unsqueeze(1)  # (B, 1, H, W)
             
-            # Morphological dilation
-            dilated = F.conv2d(
+            # Binary morphology with explicit zero padding. The image exterior
+            # is therefore background, including for objects touching an edge.
+            padded = F.pad(
                 class_mask,
-                self.kernel,
-                padding=(self.kernel_size // 2, self.kernel_size // 2)
+                (padding, padding, padding, padding),
+                mode='constant',
+                value=0.0,
             )
-            
-            # Morphological erosion
-            eroded = 1 - F.conv2d(
-                1 - class_mask,
-                self.kernel,
-                padding=(self.kernel_size // 2, self.kernel_size // 2)
-            )
+            dilated = F.max_pool2d(padded, self.kernel_size, stride=1)
+            eroded = -F.max_pool2d(-padded, self.kernel_size, stride=1)
             
             # Boundary = dilated - eroded
             class_boundary = (dilated - eroded > 0).float()
             boundary_masks.append(class_boundary)
         
-        # Union of all class boundaries
-        boundary_union = torch.stack(boundary_masks, dim=1).max(dim=1)[0]  # (B, H, W)
+        if not boundary_masks:
+            return torch.zeros((B, H, W), dtype=torch.float32, device=label.device)
+
+        # Union of all class boundaries.
+        boundary_union = torch.stack(boundary_masks, dim=0).amax(dim=0).squeeze(1)
         
         return boundary_union
     
@@ -269,11 +286,11 @@ class BoundaryWeightedKLLoss(nn.Module):
         B, C, H, W = teacher_logits.shape
         
         # Compute soft distributions with temperature
-        teacher_probs = F.softmax(teacher_logits / self.temperature, dim=1)
+        teacher_probs = F.softmax(teacher_logits / self.temperature, dim=1).detach()
         student_probs = F.softmax(student_logits / self.temperature, dim=1)
         
         # Extract boundary mask from ground truth
-        boundary_mask = self.extract_boundary_mask(labels, ignore_label)
+        boundary_mask = self.extract_boundary_mask(labels, ignore_label, num_classes=C)
         
         # Valid mask (not ignore label)
         valid_mask = (labels != ignore_label).float()
@@ -283,7 +300,7 @@ class BoundaryWeightedKLLoss(nn.Module):
             teacher_entropy = self.compute_entropy(teacher_probs)
             # r = clip(1 - H / log(C), [0, 1])
             confidence_gate = torch.clamp(
-                1 - teacher_entropy / np.log(C),
+                1 - teacher_entropy / math.log(C),
                 min=0.0,
                 max=1.0
             )
@@ -299,11 +316,9 @@ class BoundaryWeightedKLLoss(nn.Module):
         )
         kl_div = torch.sum(kl_div, dim=1)  # (B, H, W)
         
-        # Weighted KL loss with normalization
+        # Eq. (5): normalize by B*H*W, not by the sum of the adaptive weights.
         weighted_kl = weights * kl_div
-        total_weight = torch.sum(weights) + self.epsilon
-        
-        loss = torch.sum(weighted_kl) / total_weight
+        loss = torch.sum(weighted_kl) / float(B * H * W)
         
         return loss
 
@@ -345,24 +360,33 @@ class HierMedKDLoss(nn.Module):
         student_logits: torch.Tensor,
         labels: torch.Tensor,
         ignore_label: int = 255,
-        stage_weights: Optional[List[float]] = None
+        stage_weights: Optional[List[float]] = None,
+        native_student_features: Optional[List[torch.Tensor]] = None
     ) -> Dict[str, torch.Tensor]:
         """
         Args:
             teacher_features: List of teacher feature maps
-            student_features: List of student feature maps
+            student_features: List of channel-aligned student feature maps
             teacher_logits: Teacher output logits
             student_logits: Student output logits
             labels: Ground truth labels
             ignore_label: Label value to ignore
             stage_weights: Optional weights for each stage
+            native_student_features: Student features before channel adapters.
+                Required for the paper's channel-independent activation loss;
+                falls back to student_features for backward compatibility.
         
         Returns:
             Dictionary of loss components
         """
         # Compute individual losses
         feat_loss = self.feature_loss(teacher_features, student_features, stage_weights)
-        att_loss = self.activation_loss(teacher_features, student_features, stage_weights)
+        activation_features = (
+            native_student_features
+            if native_student_features is not None
+            else student_features
+        )
+        att_loss = self.activation_loss(teacher_features, activation_features, stage_weights)
         bkl_loss = self.boundary_loss(teacher_logits, student_logits, labels, ignore_label)
         
         # Total distillation loss

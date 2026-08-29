@@ -37,13 +37,20 @@ class DepthwiseSeparableConv(nn.Module):
         self.pw_bn = nn.BatchNorm2d(out_channels)
         self.act = nn.GELU()
     
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
+    def forward(
+        self,
+        x: torch.Tensor,
+        mask: Optional[torch.Tensor] = None,
+    ) -> torch.Tensor:
+        identity = x
         x = self.dw_conv(x)
         x = self.dw_bn(x)
         x = self.act(x)
         x = self.pw_conv(x)
         x = self.pw_bn(x)
         x = self.act(x)
+        if x.shape == identity.shape:
+            x = x + identity
         return x
 
 
@@ -88,7 +95,11 @@ class WindowAttentionLite(nn.Module):
         
         nn.init.trunc_normal_(self.relative_position_bias_table, std=0.02)
     
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
+    def forward(
+    self,
+    x: torch.Tensor,
+    mask: Optional[torch.Tensor] = None,
+) -> torch.Tensor:
         B_, N, C = x.shape
         
         qkv = self.qkv(x).reshape(B_, N, 3, self.num_heads, C // self.num_heads).permute(2, 0, 3, 1, 4)
@@ -103,6 +114,14 @@ class WindowAttentionLite(nn.Module):
         relative_position_bias = relative_position_bias.permute(2, 0, 1).contiguous()
         attn = attn + relative_position_bias.unsqueeze(0)
         
+        if mask is not None:
+            num_windows = mask.shape[0]
+            attn = attn.view(
+                B_ // num_windows, num_windows, self.num_heads, N, N
+            )
+            attn = attn + mask.unsqueeze(0).unsqueeze(2)
+            attn = attn.view(-1, self.num_heads, N, N)
+
         attn = F.softmax(attn, dim=-1)
         
         x = (attn @ v).transpose(1, 2).reshape(B_, N, C)
@@ -146,7 +165,7 @@ class TransformerBlockLite(nn.Module):
         
         shortcut = x
         x = self.norm1(x)
-        x = x.view(B, H, W, C)
+        x = x.reshape(B, H, W, C)
         
         # Pad if needed
         pad_l = pad_t = 0
@@ -158,15 +177,32 @@ class TransformerBlockLite(nn.Module):
         # Cyclic shift
         if self.shift_size > 0:
             shifted_x = torch.roll(x, shifts=(-self.shift_size, -self.shift_size), dims=(1, 2))
+            image_mask = torch.zeros((1, Hp, Wp, 1), device=x.device)
+            h_slices = (
+                slice(0, -self.window_size),
+                slice(-self.window_size, -self.shift_size),
+                slice(-self.shift_size, None),
+            )
+            w_slices = h_slices
+            region_id = 0
+            for h_slice in h_slices:
+                for w_slice in w_slices:
+                    image_mask[:, h_slice, w_slice, :] = region_id
+                    region_id += 1
+            mask_windows = self._window_partition(image_mask, self.window_size)
+            mask_windows = mask_windows.view(-1, self.window_size ** 2)
+            attn_mask = mask_windows.unsqueeze(1) - mask_windows.unsqueeze(2)
+            attn_mask = attn_mask.masked_fill(attn_mask != 0, -100.0)
         else:
             shifted_x = x
+            attn_mask = None
         
         # Partition windows
         x_windows = self._window_partition(shifted_x, self.window_size)
         x_windows = x_windows.view(-1, self.window_size * self.window_size, C)
         
         # Attention
-        attn_windows = self.attn(x_windows)
+        attn_windows = self.attn(x_windows, attn_mask)
         
         # Merge windows
         attn_windows = attn_windows.view(-1, self.window_size, self.window_size, C)
@@ -270,9 +306,8 @@ class LiteMedFormerSEncoder(nn.Module):
         """
         features = []
         
-        # Stem
+        # Stem is part of stage 1 and is not exposed as a separate KD stage.
         x = self.stem(x)  # (B, 32, H/4, W/4)
-        features.append(x)
         
         # Stage 1
         x = self.stage1(x)
@@ -287,28 +322,28 @@ class LiteMedFormerSEncoder(nn.Module):
         B, C, H, W = x.shape
         x = x.flatten(2).transpose(1, 2)
         x = self.stage3_down[0](x)
-        x = x.view(B, C, H, W)
+        x = x.reshape(B, C, H, W)
         x = self.stage3_down[1](x)
         
         B, C, H, W = x.shape
         x = x.flatten(2).transpose(1, 2)
         for blk in self.stage3:
             x = blk(x, H, W)
-        x = x.view(B, C, H, W)
+        x = x.reshape(B, C, H, W)
         features.append(x)
         
         # Stage 4
         B, C, H, W = x.shape
         x = x.flatten(2).transpose(1, 2)
         x = self.stage4_down[0](x)
-        x = x.view(B, C, H, W)
+        x = x.reshape(B, C, H, W)
         x = self.stage4_down[1](x)
         
         B, C, H, W = x.shape
         x = x.flatten(2).transpose(1, 2)
         for blk in self.stage4:
             x = blk(x, H, W)
-        x = x.view(B, C, H, W)
+        x = x.reshape(B, C, H, W)
         features.append(x)
         
         return features

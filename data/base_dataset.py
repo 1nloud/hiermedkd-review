@@ -25,7 +25,7 @@ class BaseMedicalDataset(Dataset):
         split: str = 'train',
         image_size: Tuple[int, int] = (224, 224),
         in_channels: int = 1,
-        num_classes: int = 8,
+        num_classes: int = 9,
         ignore_label: int = 255,
         transform: Optional[Callable] = None,
         horizontal_flip_probability: float = 0.0
