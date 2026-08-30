@@ -219,7 +219,7 @@ half-widths of 95% patient- or image-level bootstrap intervals over three seeds.
 
 | Dataset | Dice (%) | HD95 | Additional metric |
 |---|---:|---:|---:|
-| Synapse/BTCV | 86.45 +- 0.78 | 12.34 +- 1.23 mm | NSD 78.56 +- 1.87% |
+| Synapse/BTCV | 86.45 +- 0.78 | 11.34 +- 1.23 mm | NSD 80.12 +- 1.87% |
 | ACDC | 91.89 +- 0.78 | 5.67 +- 0.72 mm | NSD 91.34 +- 1.56% |
 | ISIC 2018 | 90.89 +- 0.82 | 9.45 +- 1.23 px | Jaccard 83.12 +- 0.95% |
 
