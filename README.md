@@ -1,6 +1,6 @@
-# HierMedKD: Hierarchical Boundary-Aware Distillation for Medical Image Segmentation Across Heterogeneous Imaging Modalities
+# 	HierMedKD: Hierarchical Distillation with Entropy-Gated Boundary Supervision for Medical Image Segmentation
 
-Anonymous implementation accompanying a manuscript submitted to MMM 2027 for
+Anonymous implementation accompanying a manuscript submitted to CVM 2027 for
 double-blind review. This repository contains no author names, affiliations, or
 personal contact details.
 
@@ -219,9 +219,9 @@ half-widths of 95% patient- or image-level bootstrap intervals over three seeds.
 
 | Dataset | Dice (%) | HD95 | Additional metric |
 |---|---:|---:|---:|
-| Synapse/BTCV | 86.45 +- 0.78 | 11.34 +- 1.23 mm | NSD 80.12 +- 1.87% |
-| ACDC | 92.67 +- 0.72 | 5.67 +- 0.72 mm | NSD 91.34 +- 1.56% |
-| ISIC 2018 | 90.89 +- 0.82 | 9.45 +- 1.23 px | Jaccard 83.12 +- 0.95% |
+| Synapse/BTCV | 86.45 +- 1.25 | 11.34 +- 2.04 mm | NSD 80.12 +- 1.87% |
+| ACDC | 92.67 +- 1.33 | 5.67 +- 1.50 mm | NSD 91.34 +- 1.56% |
+| ISIC 2018 | 90.89 +- 4.90 | 9.45 +- 1.23 px | Jaccard 83.66 +- 7.93% |
 
 Synapse model-only measurements at `1 x 1 x 224 x 224`:
 
